@@ -3,13 +3,6 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { FileTreeItem } from "vscode-azureappservice";
-import { FileEditor } from "../explorer/editors/FileEditor";
+import * as nls from 'vscode-nls';
 
-export async function showFile(node: FileTreeItem, fileEditor: FileEditor): Promise<void> {
-    if (node.isReadOnly) {
-        await node.openReadOnly();
-    } else {
-        await fileEditor.showEditor(node);
-    }
-}
+export const localize: nls.LocalizeFunc = nls.loadMessageBundle();

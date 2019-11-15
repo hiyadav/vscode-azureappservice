@@ -11,12 +11,12 @@ import { ext } from '../../extensionVariables';
 import { isPathEqual } from '../../utils/pathUtils';
 import { getWorkspaceSetting, updateWorkspaceSetting } from '../../vsCodeConfig/settings';
 import * as tasks from '../../vsCodeConfig/tasks';
-import { IDeployWizardContext } from "./IDeployWizardContext";
+import { IDeployContext } from "./IDeployContext";
 
 const cleanId: string = 'clean';
 const publishId: string = 'publish-release';
 
-export async function setPreDeployTaskForDotnet(context: IDeployWizardContext): Promise<void> {
+export async function setPreDeployTaskForDotnet(context: IDeployContext): Promise<void> {
     const preDeployTaskSetting: string = 'preDeployTask';
     const showPreDeployWarningSetting: string = 'showPreDeployWarning';
     const workspaceFspath: string = context.workspace.uri.fsPath;
@@ -29,7 +29,7 @@ export async function setPreDeployTaskForDotnet(context: IDeployWizardContext): 
     }
 
     // if the user is deploying a different folder than the root, use this folder without setting up defaults
-    if (!isPathEqual(context.deployFsPath, workspaceFspath)) {
+    if (!isPathEqual(context.originalDeployFsPath, workspaceFspath)) {
         return;
     }
 
@@ -58,8 +58,8 @@ export async function setPreDeployTaskForDotnet(context: IDeployWizardContext): 
         await updateWorkspaceSetting(preDeployTaskSetting, publishId, workspaceFspath);
         await updateWorkspaceSetting(constants.configurationSettings.deploySubpath, deploySubpath, workspaceFspath);
 
-        // update the deployContext.deployFsPath with the .NET output path since getDeployFsPath is called prior to this
-        context.deployFsPath = path.join(workspaceFspath, deploySubpath);
+        // update the deployContext.effectiveDeployPath with the .NET output path since getDeployFsPath is called prior to this
+        context.effectiveDeployFsPath = path.join(workspaceFspath, deploySubpath);
 
         const existingTasks: tasks.ITask[] = tasks.getTasks(context.workspace);
         const publishTask: tasks.ITask | undefined = existingTasks.find(t1 => {
@@ -88,8 +88,8 @@ export async function setPreDeployTaskForDotnet(context: IDeployWizardContext): 
     }
 }
 
-async function tryGetCsprojFile(context: IDeployWizardContext, projectPath: string): Promise<string | undefined> {
-    let projectFiles: string[] = await checkFolderForCsproj(projectPath);
+async function tryGetCsprojFile(context: IDeployContext, projectPath: string): Promise<string | undefined> {
+    const projectFiles: string[] = await checkFolderForCsproj(projectPath);
     // it's a common pattern to have the .csproj file in a subfolder so check one level deeper
     if (projectFiles.length === 0) {
         const subfolders: string[] = await fse.readdir(projectPath);
@@ -97,7 +97,7 @@ async function tryGetCsprojFile(context: IDeployWizardContext, projectPath: stri
             const filePath: string = path.join(projectPath, folder);
             // check its existence as this will check .vscode even if the project doesn't contain that folder
             if (await fse.pathExists(filePath) && (await fse.stat(filePath)).isDirectory()) {
-                projectFiles = projectFiles.concat(await checkFolderForCsproj(filePath));
+                projectFiles.push(...await checkFolderForCsproj(filePath));
                 context.telemetry.properties.csprojInSubfolder = 'true';
             }
         }));
@@ -158,18 +158,5 @@ function generateDotnetTasks(subfolder: string): TaskDefinition[] {
         dependsOn: cleanId
     };
 
-    const buildTask: TaskDefinition = {
-        label: "build",
-        command: "dotnet",
-        type: "process",
-        args: [
-            "build",
-            cwd,
-            "/property:GenerateFullPaths=true",
-            "/consoleloggerparameters:NoSummary"
-        ],
-        problemMatcher: "$msCompile"
-    };
-
-    return [cleanTask, publishTask, buildTask];
+    return [cleanTask, publishTask];
 }

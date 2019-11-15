@@ -6,18 +6,17 @@
 import * as WebSiteModels from 'azure-arm-website/lib/models';
 import * as fse from 'fs-extra';
 import * as path from 'path';
-import { MessageItem, window } from 'vscode';
-import { AppSettingsTreeItem, AppSettingTreeItem, deleteSite, DeploymentsTreeItem, DeploymentTreeItem, ISiteTreeRoot, LinuxRuntimes, SiteClient } from 'vscode-azureappservice';
+import { MessageItem } from 'vscode';
+import { AppSettingsTreeItem, AppSettingTreeItem, deleteSite, DeploymentsTreeItem, DeploymentTreeItem, FolderTreeItem, ISiteTreeRoot, LinuxRuntimes, LogFilesTreeItem, SiteClient, SiteFilesTreeItem } from 'vscode-azureappservice';
 import { AzExtTreeItem, AzureParentTreeItem, AzureTreeItem, DialogResponses, IActionContext } from 'vscode-azureextensionui';
-import { toggleValueVisibilityCommandId } from '../constants';
 import * as constants from '../constants';
 import { ext } from '../extensionVariables';
 import { openUrl } from '../utils/openUrl';
+import { venvUtils } from '../utils/venvUtils';
 import { getWorkspaceSetting, updateWorkspaceSetting } from '../vsCodeConfig/settings';
 import { ConnectionsTreeItem } from './ConnectionsTreeItem';
 import { CosmosDBConnection } from './CosmosDBConnection';
 import { CosmosDBTreeItem } from './CosmosDBTreeItem';
-import { FolderTreeItem } from './FolderTreeItem';
 import { NotAvailableTreeItem } from './NotAvailableTreeItem';
 import { WebJobsNATreeItem, WebJobsTreeItem } from './WebJobsTreeItem';
 
@@ -29,8 +28,8 @@ export abstract class SiteTreeItem extends AzureParentTreeItem<ISiteTreeRoot> {
     public deploymentsNode: DeploymentsTreeItem | undefined;
 
     private readonly _connectionsNode: ConnectionsTreeItem;
-    private readonly _folderNode: FolderTreeItem;
-    private readonly _logFolderNode: FolderTreeItem;
+    private readonly _siteFilesNode: SiteFilesTreeItem;
+    private readonly _logFilesNode: LogFilesTreeItem;
     private readonly _webJobsNode: WebJobsTreeItem | WebJobsNATreeItem;
 
     private readonly _root: ISiteTreeRoot;
@@ -41,10 +40,10 @@ export abstract class SiteTreeItem extends AzureParentTreeItem<ISiteTreeRoot> {
         this._root = Object.assign({}, parent.root, { client });
         this._state = client.initialState;
 
-        this.appSettingsNode = new AppSettingsTreeItem(this, toggleValueVisibilityCommandId);
+        this.appSettingsNode = new AppSettingsTreeItem(this);
         this._connectionsNode = new ConnectionsTreeItem(this);
-        this._folderNode = new FolderTreeItem(this, 'Files', "/site/wwwroot");
-        this._logFolderNode = new FolderTreeItem(this, 'Logs', '/LogFiles', 'logFolder');
+        this._siteFilesNode = new SiteFilesTreeItem(this, false);
+        this._logFilesNode = new LogFilesTreeItem(this);
         // Can't find actual documentation on this, but the portal claims it and this feedback suggests it's not planned https://aka.ms/AA4q5gi
         this._webJobsNode = this.root.client.isLinux ? new WebJobsNATreeItem(this) : new WebJobsTreeItem(this);
     }
@@ -84,8 +83,8 @@ export abstract class SiteTreeItem extends AzureParentTreeItem<ISiteTreeRoot> {
     public async loadMoreChildrenImpl(_clearCache: boolean): Promise<AzureTreeItem<ISiteTreeRoot>[]> {
         const siteConfig: WebSiteModels.SiteConfig = await this.root.client.getSiteConfig();
         const sourceControl: WebSiteModels.SiteSourceControl = await this.root.client.getSourceControl();
-        this.deploymentsNode = new DeploymentsTreeItem(this, siteConfig, sourceControl, 'appService.ConnectToGitHub');
-        return [this.appSettingsNode, this._connectionsNode, this.deploymentsNode, this._folderNode, this._logFolderNode, this._webJobsNode];
+        this.deploymentsNode = new DeploymentsTreeItem(this, siteConfig, sourceControl);
+        return [this.appSettingsNode, this._connectionsNode, this.deploymentsNode, this._siteFilesNode, this._logFilesNode, this._webJobsNode];
     }
 
     public compareChildrenImpl(ti1: AzureTreeItem<ISiteTreeRoot>, ti2: AzureTreeItem<ISiteTreeRoot>): number {
@@ -114,7 +113,7 @@ export abstract class SiteTreeItem extends AzureParentTreeItem<ISiteTreeRoot> {
                 case DeploymentTreeItem.contextValue:
                     return this.deploymentsNode;
                 case FolderTreeItem.contextValue:
-                    return this._folderNode;
+                    return this._siteFilesNode;
                 case WebJobsTreeItem.contextValue:
                     return this._webJobsNode;
                 default:
@@ -151,31 +150,24 @@ export abstract class SiteTreeItem extends AzureParentTreeItem<ISiteTreeRoot> {
     }
 
     public async promptScmDoBuildDeploy(fsPath: string, runtime: string, context: IActionContext): Promise<void> {
-        const dontShowAgainButton: MessageItem = { title: "No, and don't show again" };
-        const learnMoreButton: MessageItem = { title: 'Learn More' };
+        context.telemetry.properties.enableScmInput = "Canceled";
+
+        const learnMoreLink: string = 'https://aka.ms/Kwwkbd';
+
         const buildDuringDeploy: string = `Would you like to update your workspace configuration to run build commands on the target server? This should improve deployment performance.`;
-        let input: MessageItem | undefined = learnMoreButton;
-        while (input === learnMoreButton) {
-            input = await window.showInformationMessage(buildDuringDeploy, DialogResponses.yes, dontShowAgainButton, learnMoreButton);
-            if (input === learnMoreButton) {
-                await openUrl('https://aka.ms/Kwwkbd');
-            }
-        }
+        const input: MessageItem | undefined = await ext.ui.showWarningMessage(buildDuringDeploy, { modal: true, learnMoreLink }, DialogResponses.yes, DialogResponses.no);
+
         if (input === DialogResponses.yes) {
             await this.enableScmDoBuildDuringDeploy(fsPath, runtime);
             context.telemetry.properties.enableScmInput = "Yes";
         } else {
             await updateWorkspaceSetting(constants.configurationSettings.showBuildDuringDeployPrompt, false, fsPath);
-            context.telemetry.properties.enableScmInput = "No, and don't show again";
-        }
-
-        if (!context.telemetry.properties.enableScmInput) {
-            context.telemetry.properties.enableScmInput = "Canceled";
+            context.telemetry.properties.enableScmInput = "No";
         }
     }
 
     public async enableScmDoBuildDuringDeploy(fsPath: string, runtime: string): Promise<void> {
-        const zipIgnoreFolders: string[] = this.getIgnoredFoldersForDeployment(runtime);
+        const zipIgnoreFolders: string[] = await this.getIgnoredFoldersForDeployment(fsPath, runtime);
         let oldSettings: string[] | string | undefined = getWorkspaceSetting(constants.configurationSettings.zipIgnorePattern, fsPath);
         if (!oldSettings) {
             oldSettings = [];
@@ -214,21 +206,38 @@ export abstract class SiteTreeItem extends AzureParentTreeItem<ISiteTreeRoot> {
 
     }
 
-    private getIgnoredFoldersForDeployment(runtime: string): string[] {
+    private async getIgnoredFoldersForDeployment(fsPath: string, runtime: string): Promise<string[]> {
         let ignoredFolders: string[];
         switch (runtime) {
             case LinuxRuntimes.node:
                 ignoredFolders = ['node_modules{,/**}'];
                 break;
             case LinuxRuntimes.python:
+                let venvFsPaths: string[];
+                try {
+                    venvFsPaths = (await venvUtils.getExistingVenvs(fsPath)).map(venvPath => `${venvPath}{,/**}`);
+                } catch (error) {
+                    // if there was an error here, don't block-- just assume none could be detected
+                    venvFsPaths = [];
+                }
+
                 // list of Python ignorables are pulled from here https://github.com/github/gitignore/blob/master/Python.gitignore
                 // Byte-compiled / optimized / DLL files
                 ignoredFolders = ['__pycache__{,/**}', '*.py[cod]', '*$py.class',
                     // Distribution / packaging
                     '.Python{,/**}', 'build{,/**}', 'develop-eggs{,/**}', 'dist{,/**}', 'downloads{,/**}', 'eggs{,/**}', '.eggs{,/**}', 'lib{,/**}', 'lib64{,/**}', 'parts{,/**}', 'sdist{,/**}', 'var{,/**}',
-                    'wheels{,/**}', 'share/python-wheels{,/**}', '*.egg-info{,/**}', '.installed.cfg', '*.egg', 'MANIFEST',
-                    // Environments
-                    '.env{,/**}', '.venv{,/**}', 'env{,/**}', 'venv{,/**}', 'ENV{,/**}', 'env.bak{,/**}', 'venv.bak{,/**}'];
+                    'wheels{,/**}', 'share/python-wheels{,/**}', '*.egg-info{,/**}', '.installed.cfg', '*.egg', 'MANIFEST'];
+
+                // Virtual Environments
+                const defaultVenvPaths: string[] = ['.env{,/**}', '.venv{,/**}', 'env{,/**}', 'venv{,/**}', 'ENV{,/**}', 'env.bak{,/**}', 'venv.bak{,/**}'];
+                for (const venvPath of venvFsPaths) {
+                    // don't add duplicates
+                    if (!defaultVenvPaths.find(p => p === venvPath)) {
+                        defaultVenvPaths.push(venvPath);
+                    }
+                }
+
+                ignoredFolders = ignoredFolders.concat(defaultVenvPaths);
                 break;
             default:
                 ignoredFolders = [];
