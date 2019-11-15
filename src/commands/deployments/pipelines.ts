@@ -22,13 +22,13 @@ export async function browse(context: IActionContext, node: SiteTreeItem): Promi
 async function IsAzurePipelinesExtensionInstalled(): Promise<boolean> {
     let pipelinesExtension = vscode.extensions.getExtension(azurePipelinesExtensionId);
     if (!pipelinesExtension) {
-        vscode.window.showInformationMessage('Please install `Azure Pipelines` extension to continue.');
+        vscode.window.showInformationMessage('Please install `Deploy to Azure` extension to continue.');
         const commandToRun = 'extension.open';
         const listOfCommands = await vscode.commands.getCommands();
         if (listOfCommands.find((x: string) => x === commandToRun)) {
             vscode.commands.executeCommand(commandToRun, azurePipelinesExtensionId);
         } else {
-            await openUrl('https://marketplace.visualstudio.com/items?itemName=ms-azure-devops.azure-pipelines');
+            await openUrl('https://marketplace.visualstudio.com/items?itemName=ms-azure-devops.azure-deploy');
         }
 
         return false;
@@ -52,6 +52,6 @@ async function executeAzurePipelineExtensionCommand(commandToRun: string, node: 
     }
 }
 
-const azurePipelinesExtensionId = 'ms-azure-devops.azure-pipelines';
-const configurePipelineCommand = 'configure-pipeline';
-const browsePipelineCommand = 'browse-pipeline';
+const azurePipelinesExtensionId = 'ms-vscode-deploy-azure.azure-deploy';
+const configurePipelineCommand = 'configure-cicd-pipeline';
+const browsePipelineCommand = 'browse-cicd-pipeline';
