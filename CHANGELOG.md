@@ -1,11 +1,15 @@
 # Change Log
 All notable changes to the "azure-appservice" extension will be documented in this file.
 
-## 0.16.1 - 2019-09-19
+## 0.17.0 - 2019-09-19
 ### Added
-- Added `Azure Pipelines extension` as a dependency for this extension.
-- Added app service right click menu option: `Configure pipeline` for Windows webapp using `Azure Pipelines`.
-- Added app service right click menu option: `Browse pipeline` for exploring deployment source setup on app service.
+- Added `Deploy to Azure extension` as a dependency for this extension.
+- Added app service right click menu option: `Configure Pipeline on WebApp` for Windows webapp using `Azure Pipelines`.
+
+## 0.16.1 - 2019-10-16
+### Fixed
+- Ignore `deploySubPath` task for local git deploys [#1185](https://github.com/microsoft/vscode-azureappservice/issues/1185)
+- Render Linux runtime choices properly when creating web apps [#1202](https://github.com/microsoft/vscode-azureappservice/issues/1202)
 
 ## 0.16.0 - 2019-09-18
 ### Added

@@ -3,17 +3,16 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import * as fs from 'fs';
-import { Readable } from 'stream';
-import * as vscode from 'vscode';
-import { getFile, IFileResult, putFile } from 'vscode-azureappservice';
-import { BaseEditor } from 'vscode-azureextensionui';
-import { nonNullProp } from '../../utils/nonNull';
-import { FileTreeItem } from '../FileTreeItem';
+import { FileTreeItem, getFile, IFileResult, putFile } from 'vscode-azureappservice';
+import { BaseEditor, IParsedError, parseError } from 'vscode-azureextensionui';
+import { ext } from '../../extensionVariables';
+import { nonNullValue } from '../../utils/nonNull';
 
 export class FileEditor extends BaseEditor<FileTreeItem> {
+    private _etags: Map<string, string> = new Map<string, string>();
+
     constructor() {
-        super('appService.showSavePrompt');
+        super(`${ext.prefix}.showSavePrompt`);
     }
 
     public async getSaveConfirmationText(node: FileTreeItem): Promise<string> {
@@ -26,7 +25,7 @@ export class FileEditor extends BaseEditor<FileTreeItem> {
 
     public async getData(node: FileTreeItem): Promise<string> {
         const result: IFileResult = await getFile(node.root.client, node.path);
-        node.etag = result.etag;
+        this._etags.set(node.fullId, result.etag);
         return result.data;
     }
 
@@ -35,12 +34,20 @@ export class FileEditor extends BaseEditor<FileTreeItem> {
         return 0;
     }
 
-    public async updateData(node: FileTreeItem): Promise<string> {
-        if (!vscode.window.activeTextEditor) {
-            throw new Error('Cannot update file after it has been closed.');
+    public async updateData(node: FileTreeItem, data: string): Promise<string> {
+        let etag: string = nonNullValue(this._etags.get(node.fullId), 'etag');
+        try {
+            await putFile(node.root.client, data, node.path, etag);
+        } catch (error) {
+            const parsedError: IParsedError = parseError(error);
+            if (parsedError.errorType === '412' && /etag/i.test(parsedError.message)) {
+                throw new Error(`ETag does not represent the latest state of the file "${node.label}". Download the file from Azure to get the latest version.`);
+            }
+            throw error;
         }
-        const localFile: Readable = fs.createReadStream(vscode.window.activeTextEditor.document.uri.fsPath);
-        node.etag = await putFile(node.root.client, localFile, node.path, nonNullProp(node, 'etag'));
+
+        etag = (await getFile(node.root.client, node.path)).etag;
+        this._etags.set(node.fullId, etag);
         return await this.getData(node);
     }
 }

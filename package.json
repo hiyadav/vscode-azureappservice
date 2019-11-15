@@ -51,7 +51,7 @@
         "onCommand:appService.appSettings.Download",
         "onCommand:appService.appSettings.Upload",
         "onCommand:appService.appSettings.ToggleSlotSetting",
-        "onCommand:appService.OpenLogStream",
+        "onCommand:appService.startStreamingLogs",
         "onCommand:appService.StopLogStream",
         "onCommand:appService.StartRemoteDebug",
         "onCommand:appService.StartSsh",
@@ -62,7 +62,7 @@
         "onCommand:appService.Redeploy",
         "onCommand:appService.ViewCommitInGitHub",
         "onCommand:appService.DisconnectRepo",
-        "onCommand:appService.ConnectToGitHub",
+        "onCommand:appService.connectToGitHub",
         "onCommand:appService.AddCosmosDBConnection",
         "onCommand:appService.RemoveCosmosDBConnection",
         "onCommand:appService.RevealConnection",
@@ -203,7 +203,7 @@
                 "category": "Azure App Service"
             },
             {
-                "command": "appService.OpenLogStream",
+                "command": "appService.startStreamingLogs",
                 "title": "Start Streaming Logs",
                 "category": "Azure App Service"
             },
@@ -282,7 +282,7 @@
                 "category": "Azure App Service"
             },
             {
-                "command": "appService.ConnectToGitHub",
+                "command": "appService.connectToGitHub",
                 "title": "Connect to GitHub Repository...",
                 "category": "Azure App Service"
             },
@@ -297,7 +297,7 @@
                 "category": "Azure App Service"
             },
             {
-                "command": "appService.toggleValueVisibility",
+                "command": "appService.toggleAppSettingVisibility",
                 "title": "Toggle App Value Visibility",
                 "category": "Azure App Service",
                 "icon": {
@@ -351,7 +351,7 @@
                     "when": "never"
                 },
                 {
-                    "command": "appService.toggleValueVisibility",
+                    "command": "appService.toggleAppSettingVisibility",
                     "when": "never"
                 },
                 {
@@ -443,12 +443,7 @@
                     "group": "3_appServiceDeployCommands@2"
                 },
                 {
-                    "command": "appService.ConfigureDeploymentSource",
-                    "when": "view == azureAppService && viewItem == appService",
-                    "group": "3_appServiceDeployCommands@4"
-                },
-                {
-                    "command": "appService.OpenLogStream",
+                    "command": "appService.startStreamingLogs",
                     "when": "view == azureAppService && viewItem == appService",
                     "group": "4_appServiceDiagnosticsCommands@1"
                 },
@@ -538,7 +533,7 @@
                     "group": "3_deploymentSlotDeployCommands@2"
                 },
                 {
-                    "command": "appService.OpenLogStream",
+                    "command": "appService.startStreamingLogs",
                     "when": "view == azureAppService && viewItem == deploymentSlot",
                     "group": "4_deploymentSlotDiagnosticsCommands@1"
                 },
@@ -559,22 +554,22 @@
                 },
                 {
                     "command": "appService.EnableFileLogging",
-                    "when": "view == azureAppService && viewItem == logFolder",
+                    "when": "view == azureAppService && viewItem == logFiles",
                     "group": "1_folderGeneralCommands@1"
                 },
                 {
                     "command": "appService.Refresh",
-                    "when": "view == azureAppService && viewItem == folder",
+                    "when": "view == azureAppService && viewItem == siteFiles",
                     "group": "1_folderGeneralCommands@2"
                 },
                 {
                     "command": "appService.Refresh",
-                    "when": "view == azureAppService && viewItem == subFolder",
+                    "when": "view == azureAppService && viewItem == folder",
                     "group": "1_subFolderRefreshCommands@1"
                 },
                 {
                     "command": "appService.Refresh",
-                    "when": "view == azureAppService && viewItem == logFolder",
+                    "when": "view == azureAppService && viewItem == logFiles",
                     "group": "2_folderGeneralCommands@1"
                 },
                 {
@@ -633,7 +628,7 @@
                     "group": "1_appSettingItemEdit@4"
                 },
                 {
-                    "command": "appService.toggleValueVisibility",
+                    "command": "appService.toggleAppSettingVisibility",
                     "when": "view == azureAppService && viewItem == applicationSettingItem",
                     "group": "inline"
                 },
@@ -837,6 +832,11 @@
                     "type": "boolean",
                     "description": "Enables detectors that diagnose post-deployment Linux Container status",
                     "default": false
+                },
+                "appService.enablePythonRemoteDebugging": {
+                    "type": "boolean",
+                    "description": "Enable remote debugging for Python web apps (experimental)",
+                    "default": false
                 }
             }
         },
@@ -887,9 +887,10 @@
         "fs-extra": "^4.0.2",
         "portfinder": "^1.0.13",
         "request-promise": "^4.2.2",
-        "vscode-azureappservice": "^0.46.0",
-        "vscode-azureextensionui": "^0.28.1",
-        "vscode-azurekudu": "^0.1.8"
+        "vscode-azureappservice": "^0.52.0",
+        "vscode-azureextensionui": "^0.28.3",
+        "vscode-azurekudu": "^0.1.8",
+        "vscode-nls": "^4.1.1"
     },
     "extensionDependencies": [
         "ms-vscode.azure-account"
