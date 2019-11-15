@@ -159,7 +159,7 @@
             },
             {
                 "command": "appService.configureAzureWebAppPipeline",
-                "title": "Configure Pipeline on WebApp",
+                "title": "Configure CI/CD Pipeline",
                 "category": "Azure App Service"
             },
             {

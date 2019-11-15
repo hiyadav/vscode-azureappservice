@@ -4,7 +4,7 @@ All notable changes to the "azure-appservice" extension will be documented in th
 ## 0.17.0 - 2019-09-19
 ### Added
 - Added `Deploy to Azure extension` as a dependency for this extension.
-- Added app service right click menu option: `Configure Pipeline on WebApp` for Windows webapp using `Azure Pipelines`.
+- Added app service right click menu option: `Configure CI/CD Pipeline` for Windows webapp using `Azure Pipelines`.
 
 ## 0.16.1 - 2019-10-16
 ### Fixed
